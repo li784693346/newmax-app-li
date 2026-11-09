@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件日报</title>
+<style>
+:root{
+  --bg:#f4f1ea; --panel:#fbf9f4; --panel2:#f0ece2; --ink:#26312e; --muted:#6d7a74;
+  --faint:#9aa5a0; --line:#e0dacc; --line2:#d0c8b6;
+  --accent:#0f6e62; --accent-ink:#0b5048; --accent-soft:#dcefec;
+  --amber:#c47b12; --amber-soft:#f8ecd7;
+  --danger:#b3423c; --danger-soft:#f6e0de;
+  --ok:#2f8e5b; --shadow:0 1px 3px rgba(38,49,46,.08),0 6px 20px rgba(38,49,46,.07);
+  --radius:10px;
+  font-size:15px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:system-ui,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+input{font:inherit;color:var(--ink)}
+
+/* ---------- 顶栏 ---------- */
+#topbar{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;
+  padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line);
+}
+#brand{display:flex;align-items:center;gap:10px;min-width:0}
+#brandIcon{width:30px;height:30px;flex:none;border-radius:8px;background:linear-gradient(135deg,#128577,#0b5048);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700}
+#brandIcon img{width:30px;height:30px;border-radius:8px}
+#brandName{font-weight:700;font-size:17px;white-space:nowrap}
+#topRight{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
+#svc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+#svcDot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+#svcDot.on{background:var(--ok)} #svcDot.off{background:var(--danger)} #svcDot.wait{background:var(--amber)}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;
+  border:1px solid var(--line2);background:var(--panel);font-size:13.5px;white-space:nowrap;
+  transition:background .15s,border-color .15s;
+}
+.btn:hover{background:var(--panel2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.icon{padding:7px 9px}
+
+/* ---------- 扫描进度 ---------- */
+#progress{display:none;padding:8px 20px;background:var(--amber-soft);border-bottom:1px solid var(--line);
+  font-size:13px;color:#7a5210;align-items:center;gap:10px}
+#progress.show{display:flex}
+#progressBarWrap{flex:1;height:6px;border-radius:3px;background:#fff;overflow:hidden;max-width:320px}
+#progressBar{height:100%;width:30%;background:var(--amber);border-radius:3px;transition:width .4s;
+  animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+
+/* ---------- 主体 ---------- */
+main{max-width:980px;margin:0 auto;padding:16px 20px 60px}
+
+#toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
+#dateNav{display:flex;align-items:center;gap:6px}
+#dateLabel{font-size:21px;font-weight:700;min-width:150px;text-align:center;line-height:1.2}
+#dateLabel small{display:block;font-size:11.5px;font-weight:400;color:var(--muted)}
+.navbtn{width:32px;height:32px;border-radius:8px;border:1px solid var(--line2);background:var(--panel);
+  font-size:15px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.navbtn:hover{background:var(--panel2);color:var(--ink)}
+#datePick{padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--panel)}
+
+#segWrap{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px}
+.seg button{padding:5px 12px;border-radius:6px;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(38,49,46,.1)}
+#search{padding:7px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--panel);
+  width:190px;font-size:13.5px}
+#search::placeholder{color:var(--faint)}
+
+/* 时间线 chips */
+#timeline{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;margin-bottom:4px;scrollbar-width:thin}
+.tl-chip{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 10px;
+  border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;min-width:58px}
+.tl-chip:hover{border-color:var(--line2);background:var(--panel2)}
+.tl-chip.on{border-color:var(--accent);background:var(--accent-soft)}
+.tl-chip.today{box-shadow:inset 0 -2px 0 var(--amber)}
+.tl-d{font-size:11.5px;color:var(--muted)}
+.tl-n{font-size:13px;font-weight:700}
+.tl-chip.zero .tl-n{color:var(--faint);font-weight:400}
+
+/* 统计条 */
+#statsbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;padding:10px 14px;margin-bottom:14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);font-size:13.5px;color:var(--muted)}
+#statsbar b{font-size:16px;color:var(--ink);margin-right:2px}
+#scanInfo{margin-left:auto;font-size:12px;color:var(--faint)}
+
+/* 每日实时小结 */
+#summary{margin-bottom:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;box-shadow:var(--shadow)}
+.sum-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.sum-title{font-weight:700;font-size:14.5px}
+.sum-sub{font-size:12px;color:var(--muted)}
+.sum-head .btn{margin-left:auto;font-size:12.5px;padding:5px 12px}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.sum-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12.5px}
+.sum-card h4{margin:0 0 7px;font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.5px}
+.sum-li{display:flex;justify-content:space-between;gap:8px;padding:1px 0;color:var(--ink)}
+.sl-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl-num{color:var(--muted);white-space:nowrap;font-size:11.5px}
+.sum-bar{height:4px;border-radius:2px;background:var(--line);margin:2px 0 6px;overflow:hidden}
+.sum-bar i{display:block;height:100%;border-radius:2px}
+.cat-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.sum-more{color:var(--faint);font-size:11.5px}
+.flag{padding:4px 8px;border-radius:6px;margin-bottom:5px;font-size:12px;line-height:1.5}
+.flag.ok{background:var(--accent-soft);color:var(--accent-ink)}
+.flag.warn{background:#f7ecd8;color:#7a5a1e}
+.flag.bad{background:var(--danger-soft);color:var(--danger)}
+.sum-card .score-num{font-size:26px;font-weight:800;line-height:1.1}
+.sum-card .score-num small{font-size:12px;color:var(--muted);font-weight:500}
+.score-grade{font-weight:700;font-size:13px;margin:2px 0}
+.score-ok .score-grade,.score-ok .score-num{color:var(--accent)}
+.score-warn .score-grade,.score-warn .score-num{color:#8a6116}
+.score-bad .score-grade,.score-bad .score-num{color:var(--danger)}
+.score-note{color:var(--muted);font-size:11.5px;margin-top:2px}
+#aiBox{margin-top:11px;border-top:1px dashed var(--line2);padding-top:10px}
+.ai-head{font-size:12px;font-weight:700;color:var(--accent-ink);margin-bottom:6px}
+.ai-head small{font-weight:400;color:var(--faint);margin-left:8px}
+.ai-body{font-size:13px;line-height:1.75;color:var(--ink)}
+.ai-err{color:var(--danger)}
+.ai-run{font-size:12.5px;color:var(--muted)}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line2);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .9s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* 分组卡片 */
+.grp{margin-bottom:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--shadow)}
+.grp-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none}
+.grp-head:hover{background:var(--panel2)}
+.grp-caret{font-size:11px;color:var(--faint);transition:transform .15s;flex:none}
+.grp.closed .grp-caret{transform:rotate(-90deg)}
+.grp-name{font-weight:700;font-size:14.5px}
+.grp-meta{font-size:12.5px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.grp-dot{width:9px;height:9px;border-radius:3px;flex:none}
+
+.file-row{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 20px;border-top:1px solid var(--line);
+  min-width:0}
+.file-row:hover{background:var(--panel2)}
+.badge{flex:none;min-width:34px;height:22px;padding:0 5px;border-radius:5px;color:#fff;font-size:10.5px;
+  font-weight:700;display:flex;align-items:center;justify-content:center;text-transform:uppercase;letter-spacing:.3px}
+.f-main{flex:1;min-width:0}
+.f-name{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-path{font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f-size{flex:none;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.f-time{flex:none;font-size:12.5px;color:var(--muted);width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.f-open{flex:none;opacity:0;font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--line2);
+  background:var(--panel);color:var(--muted)}
+.file-row:hover .f-open,.f-open:focus-visible{opacity:1}
+
+/* 状态卡（空/错误/首次） */
+.state-card{padding:44px 28px;text-align:center;background:var(--panel);border:1px dashed var(--line2);
+  border-radius:14px;color:var(--muted)}
+.state-card .big{font-size:34px;margin-bottom:12px}
+.state-card h3{font-size:16px;color:var(--ink);margin-bottom:8px}
+.state-card p{font-size:13.5px;line-height:1.7;max-width:520px;margin:0 auto 16px}
+.state-card .err{color:var(--danger);font-size:12.5px;margin-top:10px;word-break:break-all}
+
+/* ---------- 设置抽屉 ---------- */
+#overlay{position:fixed;inset:0;background:rgba(38,49,46,.35);opacity:0;pointer-events:none;
+  transition:opacity .2s;z-index:40}
+#overlay.show{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:-480px;bottom:0;width:min(460px,94vw);background:var(--panel);
+  z-index:50;transition:right .22s ease;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(38,49,46,.15)}
+#drawer.show{right:0}
+#drawerHead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+  border-bottom:1px solid var(--line)}
+#drawerHead h2{font-size:16px}
+#drawerBody{flex:1;overflow-y:auto;padding:16px 18px 30px}
+.set-sec{margin-bottom:24px}
+.set-sec h3{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px;
+  text-transform:none;letter-spacing:.3px}
+.set-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:8px;margin-bottom:6px;background:var(--bg);min-width:0}
+.set-item .si-path{flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-item .si-label{font-weight:600;font-size:12.5px;flex:none}
+.si-miss{color:var(--danger);font-size:11px;flex:none}
+.si-del{flex:none;color:var(--faint);font-size:14px;padding:2px 6px;border-radius:5px}
+.si-del:hover{color:var(--danger);background:var(--danger-soft)}
+.add-row{display:flex;gap:6px;margin-top:8px}
+.add-row input{flex:1;min-width:0;padding:7px 9px;border:1px solid var(--line2);border-radius:7px;
+  background:#fff;font-size:12.5px}
+.drawer-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--faint);line-height:1.6;margin-top:6px}
+
+/* toast */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);z-index:60;
+  background:var(--ink);color:#f4f1ea;padding:10px 18px;border-radius:9px;font-size:13.5px;
+  transition:transform .25s;max-width:80vw;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.bad{background:var(--danger)}
+
+@media (max-width:720px){
+  #brandSub{display:none}
+  #toolbar{gap:8px}
+  #dateLabel{font-size:17px;min-width:110px}
+  #search{width:130px}
+  #segWrap{margin-left:0}
+  main{padding:12px 12px 50px}
+  .f-path{display:none}
+}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div id="brand">
+    <span id="brandIcon">档</span>
+    <div>
+      <div id="brandName">文件日报</div>
+    </div>
+  </div>
+  <div id="topRight">
+    <span id="svc"><span id="svcDot" class="wait"></span><span id="svcText">连接中…</span></span>
+    <button class="btn" id="btnScan" disabled title="增量扫描监控目录">⟳ 刷新</button>
+    <button class="btn icon" id="btnSettings" title="设置" aria-label="设置">⚙</button>
+  </div>
+</header>
+
+<div id="progress">
+  <span id="progressText">扫描中…</span>
+  <div id="progressBarWrap"><div id="progressBar"></div></div>
+</div>
+
+<main>
+  <div id="toolbar">
+    <div id="dateNav">
+      <button class="navbtn" id="btnPrev" title="前一天（键盘 ←）" aria-label="前一天">‹</button>
+      <div id="dateLabel">—<small id="dateWeek"></small></div>
+      <button class="navbtn" id="btnNext" title="后一天（键盘 →）" aria-label="后一天">›</button>
+      <input type="date" id="datePick" aria-label="选择日期">
+      <button class="btn" id="btnToday" style="padding:6px 10px;font-size:12.5px">今天</button>
+    </div>
+    <div id="segWrap">
+      <div class="seg" role="tablist" aria-label="记录类型">
+        <button id="tabCreated" class="on">新建</button>
+        <button id="tabModified">修改</button>
+      </div>
+      <div class="seg" role="tablist" aria-label="分组方式">
+        <button id="grpSoftware" class="on">按软件</button>
+        <button id="grpType">按类型</button>
+      </div>
+      <input id="search" type="search" placeholder="搜索当天文件…" aria-label="搜索文件名">
+    </div>
+  </div>
+
+  <div id="timeline" aria-label="近期日期"></div>
+
+  <div id="statsbar" hidden>
+    <span><b id="stCount">0</b>个文件</span>
+    <span><b id="stBytes">0</b></span>
+    <span><b id="stGroups">0</b>个分组</span>
+    <span id="scanInfo"></span>
+  </div>
+
+  <div id="summary" hidden></div>
+
+  <div id="list"></div>
+</main>
+
+<div id="overlay"></div>
+<aside id="drawer" role="dialog" aria-label="设置" aria-modal="true">
+  <div id="drawerHead">
+    <h2>设置</h2>
+    <button class="btn icon" id="btnCloseDrawer" aria-label="关闭设置">✕</button>
+  </div>
+  <div id="drawerBody">
+    <div class="set-sec">
+      <h3>监控目录（扫描这些位置里的文件）</h3>
+      <div id="rootsList"></div>
+      <div class="add-row">
+        <input id="newRootPath" placeholder="目录完整路径，如 D:\工作资料">
+        <input id="newRootLabel" placeholder="显示名（可空）" style="max-width:120px">
+        <button class="btn" id="btnAddRoot">添加</button>
+      </div>
+    </div>
+    <div class="set-sec">
+      <h3>软件归属规则（目录前缀 → 软件名）</h3>
+      <div id="rulesList"></div>
+      <div class="add-row">
+        <input id="newRulePath" placeholder="目录路径，如 E:\WeChat Files">
+        <input id="newRuleSw" placeholder="软件名" style="max-width:110px">
+        <button class="btn" id="btnAddRule">添加</button>
+      </div>
+      <div class="hint">文件路径命中规则前缀时归入该软件；未命中则按所在监控目录归组。修改规则或目录后建议全量重建。</div>
+    </div>
+    <div class="set-sec">
+      <h3>索引维护</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="btnFullRescan">全量重新扫描</button>
+        <button class="btn" id="btnStopSvc" style="color:var(--danger);border-color:var(--danger)">停止服务</button>
+      </div>
+      <div class="hint">索引保存在应用数据目录，重启应用不会丢失。「全量重新扫描」会重建归属分组，修改目录/规则后需要执行一次。</div>
+      <div class="hint" id="indexStats"></div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn primary" id="btnSaveCfg">保存目录与规则</button>
+    <button class="btn" id="btnCancelCfg">关闭</button>
+  </div>
+</aside>
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const sdk = window.newmaxApp;
+
+const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+const CAT_COLORS = {文档:"#4a72b0",图片:"#8b5fbf",视频:"#c0564b",音频:"#2f9e77",
+  压缩包:"#a3743d",代码数据:"#5a6b78",安装包:"#7d5ba6",其他:"#94a0aa"};
+
+const state = {
+  date: localDate(0), tab: "created", group: "software", query: "",
+  dayData: null, overview: null, svcOk: false, collapsed: new Set(),
+  firstScanDone: false, aiBusy: false, aiCache: null,
+};
+
+function localDate(offset){
+  const d = new Date(); d.setDate(d.getDate() + (offset||0));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function parseDate(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function fmtDateCn(s){ const d=parseDate(s); return `${d.getMonth()+1}月${d.getDate()}日`; }
+function relWord(s){
+  const t=localDate(0), y=localDate(-1), yy=localDate(1);
+  return s===t?"今天":s===y?"昨天":s===yy?"明天":"";
+}
+function fmtBytes(n){
+  if(n==null) return "0";
+  if(n<1024) return n+" B";
+  if(n<1048576) return (n/1024).toFixed(n<10240?1:0)+" KB";
+  if(n<1073741824) return (n/1048576).toFixed(1)+" MB";
+  return (n/1073741824).toFixed(2)+" GB";
+}
+function fmtClock(ts){ const d=new Date(ts*1000);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function fmtScanTime(iso){
+  if(!iso) return "";
+  const d=new Date(iso); if(isNaN(d)) return iso;
+  return `${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function toast(msg, bad){
+  const t=$("#toast"); t.textContent=msg; t.className = bad?"bad show":"show";
+  clearTimeout(toast._h); toast._h=setTimeout(()=>t.classList.remove("show"), 3200);
+}
+function setSvc(on, wait){
+  state.svcOk = !!on;
+  const dot=$("#svcDot");
+  dot.className = on?"on":(wait?"wait":"off");
+  $("#svcText").textContent = on?"服务已连接":(wait?"连接中…":"服务未连接");
+  $("#btnScan").disabled = !on;
+}
+
+/* ---------------- 连接本地索引服务 ---------------- */
+async function connectService(maxTry=15){
+  for(let i=0;i<maxTry;i++){
+    try{
+      if(!sdk || !sdk.files) throw new Error("runtime-missing");
+      const txt = await sdk.files.readText("connection.json");
+      const cfg = JSON.parse(txt);
+      const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 2500);
+      let res;
+      try{ res = await fetch(cfg.baseUrl + "/health", {headers:{Authorization:"Bearer "+cfg.token}, signal:ctl.signal}); }
+      finally{ clearTimeout(to); }
+      if(!res.ok) throw new Error("health-" + res.status);
+      await res.json();
+      window.__svc = cfg; setSvc(true);
+      return true;
+    }catch(e){
+      if(e.message==="runtime-missing"){ setSvc(false); return false; }
+      await new Promise(r=>setTimeout(r,1200));
+    }
+  }
+  setSvc(false); return false;
+}
+
+async function api(path, opts){
+  const cfg = window.__svc;
+  if(!cfg) throw new Error("服务未连接");
+  const o = Object.assign({headers:{Authorization:"Bearer "+cfg.token}}, opts||{});
+  if(o.body && !o.headers["Content-Type"]) o.headers["Content-Type"]="application/json";
+  const res = await fetch(cfg.baseUrl + path, o);
+  let data=null; try{ data = await res.json(); }catch(_){}
+  if(!res.ok || (data && data.ok===false))
+    throw new Error((data && data.error) || ("HTTP "+res.status));
+  return data ? data.data : null;
+}
+
+/* ---------------- 总览与时间线 ---------------- */
+async function loadOverview(){
+  state.overview = await api("/api/overview?days=45");
+  renderTimeline();
+  renderList();
+}
+function renderTimeline(){
+  const ov=state.overview; const box=$("#timeline"); if(!ov){box.innerHTML="";return;}
+  const map={}; (ov.timeline||[]).forEach(t=>map[t.date]=t);
+  let html="";
+  for(let i=0;i<14;i++){
+    const d=localDate(-i); const slot=map[d];
+    const n=(slot? slot.n + slot.mod : 0);
+    const dd=parseDate(d);
+    html += `<button class="tl-chip${d===state.date?" on":""}${d===ov.today?" today":""}${n?"":" zero"}"
+      data-date="${d}" title="${fmtDateCn(d)}${n?` · ${n} 个文件`:" · 无记录"}">
+      <span class="tl-d">${i===0?"今天":(dd.getMonth()+1)+"/"+dd.getDate()+" "+WEEK[dd.getDay()].slice(1)}</span>
+      <span class="tl-n">${n||"·"}</span></button>`;
+  }
+  box.innerHTML=html;
+  box.querySelectorAll(".tl-chip").forEach(c=>c.onclick=()=>selectDate(c.dataset.date));
+}
+
+/* ---------------- 单日数据 ---------------- */
+async function selectDate(d){
+  state.date=d; $("#datePick").value=d;
+  await loadDay(); renderDateLabel();
+}
+async function loadDay(){
+  if(!state.svcOk) return;
+  try{
+    state.dayData = await api("/api/day?date="+state.date);
+    if(state.overview && !state.overview.hasIndex && state.dayData.hasIndex) await loadOverview();
+  }catch(e){ state.dayData=null; toast(e.message,true); }
+  renderDateLabel(); renderStats(); renderList(); renderSummary(); ensureAiCache();
+}
+function renderDateLabel(){
+  $("#dateLabel").firstChild.textContent = fmtDateCn(state.date)+" ";
+  $("#dateWeek").textContent = WEEK[parseDate(state.date).getDay()] + (relWord(state.date)?(" · "+relWord(state.date)):"");
+}
+function curBundle(){
+  const dd=state.dayData; if(!dd) return null;
+  return dd[state.tab];
+}
+function renderStats(){
+  const b=curBundle(); const bar=$("#statsbar");
+  if(!b || !state.overview){ bar.hidden=true; return; }
+  bar.hidden=false;
+  $("#stCount").textContent=b.count;
+  $("#stBytes").textContent=fmtBytes(b.bytes);
+  $("#stGroups").textContent=(state.group==="software"?b.bySoftware:b.byType).length;
+  const ov=state.overview;
+  $("#scanInfo").textContent = `共索引 ${ov.totals.files} 个文件 · 上次扫描 ${fmtScanTime(ov.lastScan)||"从未"}`;
+}
+/* ---------------- 每日实时小结 ---------------- */
+const PROG_EXT = new Set(["exe","dll","ini","db","sys","dat","bat","cmd","msi","ocx"]);
+const NOISE_EXT = new Set(["tmp","log","crdownload","part","etd","cab","old","chk"]);
+function np(p){ return String(p).replace(/\\/g,"/").replace(/\/+$/,"").toLowerCase(); }
+function parentOf(p){ const s=np(p); const i=s.lastIndexOf("/"); return i<0?"":s.slice(0,i); }
+function dayFiles(){
+  const b=curBundle(); if(!b) return [];
+  const out=[]; (b.bySoftware||[]).forEach(g=>(g.files||[]).forEach(f=>out.push(f)));
+  return out;
+}
+function buildSummary(){
+  const b=curBundle(); const files=dayFiles();
+  const rootLabels=new Map(); ((state.overview&&state.overview.roots)||[]).forEach(r=>{ if(r.path) rootLabels.set(np(r.path), r.label||""); });
+  const atRoot=files.filter(f=>rootLabels.has(parentOf(f.path)));
+  const extOf=f=>String(f.ext||"").toLowerCase();
+  const prog=atRoot.filter(f=>PROG_EXT.has(extOf(f)));
+  const noise=files.filter(f=>NOISE_EXT.has(extOf(f))||/\/(cache|temp|tmp)\//.test(np(f.path)));
+  const big=files.filter(f=>f.size>209715200);
+  const sw=[...(b.bySoftware||[])].sort((a,x)=>x.bytes-a.bytes);
+  const catMap={};
+  files.forEach(f=>{ const c=f.cat||"其他"; if(!catMap[c])catMap[c]={count:0,bytes:0}; catMap[c].count++; catMap[c].bytes+=f.size; });
+  const cats=Object.entries(catMap).sort((a,x)=>x[1].bytes-a[1].bytes);
+  const flags=[];
+  if(atRoot.length>=3) flags.push({lv:atRoot.length>15?"bad":"warn", t:`${atRoot.length} 个文件直接放在监控目录根部（未归入子文件夹）`});
+  if(prog.length>=3) flags.push({lv:"bad", t:`程序/数据类文件散落在目录根部：.${[...new Set(prog.map(extOf))].slice(0,6).join("、.")}`});
+  if(noise.length>=5 && files.length && noise.length/files.length>0.2) flags.push({lv:"warn", t:`临时/缓存类占 ${Math.round(noise.length/files.length*100)}%（${noise.length} 个）`});
+  if(big.length) flags.push({lv:"warn", t:`大文件：${big.slice(0,3).map(f=>`${f.name} ${fmtBytes(f.size)}`).join("；")}`});
+  if(sw.length>8) flags.push({lv:"warn", t:`来源分散（${sw.length} 个软件/位置）`});
+  if(!flags.length) flags.push({lv:"ok", t:`${files.length} 个文件存放规整，未发现明显堆积`});
+  let score=100;
+  if(atRoot.length>15)score-=18; else if(atRoot.length>5)score-=10; else if(atRoot.length>=3)score-=5;
+  if(prog.length>=3)score-=12;
+  if(noise.length>=5 && noise.length*5>files.length)score-=10;
+  if(big.length)score-=5;
+  if(sw.length>8)score-=4;
+  score=Math.max(5,Math.min(100,score));
+  const grade=score>=85?["井井有条","ok"]:score>=70?["基本有序","ok"]:score>=50?["需要整理","warn"]:["建议清理","bad"];
+  return {files, atRoot, prog, noise, big, sw, cats, flags, score, grade};
+}
+function renderSummary(){
+  const box=$("#summary"); if(!box) return;
+  const b=curBundle();
+  if(!b||!b.count||!state.svcOk){ box.hidden=true; box.innerHTML=""; return; }
+  const s=buildSummary();
+  const totBytes=b.bytes||1;
+  const bar=(v,color)=>`<div class="sum-bar"><i style="width:${Math.max(3,Math.min(100,Math.round(v/totBytes*100)))}%;background:${color}"></i></div>`;
+  let swHtml=s.sw.slice(0,6).map(g=>`<div class="sum-li"><span class="sl-name" title="${esc(g.key)}">${esc(g.key)}</span><span class="sl-num">${g.count} · ${fmtBytes(g.bytes)}</span></div>`+bar(g.bytes,"#0f6e62")).join("");
+  if(s.sw.length>6) swHtml+=`<div class="sum-more">另有 ${s.sw.length-6} 个来源…</div>`;
+  const catHtml=s.cats.slice(0,6).map(([c,v])=>{ const col=CAT_COLORS[c]||CAT_COLORS["其他"];
+    return `<div class="sum-li"><span class="sl-name"><span class="cat-dot" style="background:${col}"></span>${esc(c)}</span><span class="sl-num">${v.count} · ${fmtBytes(v.bytes)}</span></div>`+bar(v.bytes,col); }).join("");
+  const flagHtml=s.flags.map(f=>`<div class="flag ${f.lv}">${f.lv==="ok"?"✓":"⚠"} ${esc(f.t)}</div>`).join("");
+  box.hidden=false;
+  box.innerHTML=`
+    <div class="sum-head">
+      <span class="sum-title">📋 实时小结</span>
+      <span class="sum-sub">${state.tab==="created"?"新建":"修改"} ${s.files.length} 个 · ${fmtBytes(b.bytes)} · 随当天清单自动生成</span>
+      <button class="btn" id="btnAiSum">${state.aiBusy?"分析中…":(state.aiCache&&state.aiCache.key===sumAiKey()?"🤖 重新分析":"🤖 AI 深度分析")}</button>
+    </div>
+    <div class="sum-grid">
+      <div class="sum-card"><h4>哪些软件产生</h4>${swHtml}</div>
+      <div class="sum-card"><h4>内容构成</h4>${catHtml}</div>
+      <div class="sum-card"><h4>存放位置评估</h4>${flagHtml}</div>
+      <div class="sum-card score-${s.grade[1]}"><h4>管理能力评估</h4>
+        <div class="score-num">${s.score}<small>/100</small></div>
+        <div class="score-grade">${s.grade[0]}</div>
+        <div class="score-note">根部直放 ${s.atRoot.length} · 程序类 ${s.prog.length} · 临时 ${s.noise.length} · 大文件 ${s.big.length}</div>
+      </div>
+    </div>
+    <div id="aiBox" hidden></div>`;
+  $("#btnAiSum").onclick=aiSummarize;
+  paintAiBox();
+}
+function sumAiKey(){ return `ai-sum:${state.date}:${state.tab}`; }
+function paintAiBox(){
+  const el=$("#aiBox"); if(!el) return;
+  if(state.aiBusy){ el.hidden=false; el.innerHTML=`<div class="ai-run"><span class="spin"></span>AI 正在分析 ${fmtDateCn(state.date)} 的文件清单，可能需要几十秒…</div>`; return; }
+  const c=state.aiCache;
+  if(!c||c.key!==sumAiKey()){ el.hidden=true; el.innerHTML=""; return; }
+  el.hidden=false;
+  const meta=`模型 ${esc(c.model||"默认")} · ${fmtScanTime(c.ts)||""}`
+    +(c.truncated?" · 输出被截断":"")+(c.error?` · <span class="ai-err">${esc(c.error)}</span>`:"");
+  el.innerHTML=`<div class="ai-head">🤖 AI 深度分析<small>${meta}</small></div><div class="ai-body">${mdLite(c.text||"（无内容）")}</div>`;
+}
+function mdLite(t){ let h=esc(t);
+  h=h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  h=h.replace(/^#+\s*(.+)$/gm,"<b>$1</b>");
+  h=h.replace(/^[-*]\s+/gm,"• ");
+  return h.replace(/\n/g,"<br>"); }
+async function ensureAiCache(){
+  if(!sdk||!sdk.data||state.aiBusy) return;
+  const key=sumAiKey();
+  if(state.aiCache && state.aiCache.key===key){ const el=$("#aiBox"); if(el) paintAiBox(); return; }
+  try{ state.aiCache=await sdk.data.get(key)||null; }catch(e){ state.aiCache=null; }
+  if(state.aiCache && state.aiCache.key===key){ const bb=$("#btnAiSum"); if(bb && !state.aiBusy) bb.textContent="🤖 重新分析"; }
+  paintAiBox();
+}
+function buildAiPrompt(b){
+  const s=buildSummary();
+  const L=[];
+  L.push(`这是用户（李，暖通行业质量工程师，Windows 电脑）${state.date} ${state.tab==="created"?"新建":"修改"}的文件清单，共 ${s.files.length} 个、${fmtBytes(b.bytes)}。应用只统计了文件属性，未读取文件内容。`);
+  L.push("分组明细（按软件/位置）：");
+  s.sw.forEach(g=>{
+    const exts={}; g.files.forEach(f=>{const e=(f.ext||"?").toLowerCase(); exts[e]=(exts[e]||0)+1;});
+    const topExt=Object.entries(exts).sort((a,x)=>x[1]-a[1]).slice(0,5).map(([e,n])=>`${e}×${n}`).join("，");
+    const sample=g.files.slice(0,8).map(f=>{ const p=np(f.path); return `  - ${f.name}（${fmtBytes(f.size)}，${f.cat}，${p.length>72?"…"+p.slice(-72):p}）`; }).join("\n");
+    L.push(`【${g.key}】${g.count} 个 ${fmtBytes(g.bytes)}；扩展名：${topExt}；代表文件：\n${sample}`);
+  });
+  L.push(`规则引擎观察：${s.flags.map(f=>f.t).join("；")}。存放整洁度打分 ${s.score}/100（${s.grade[0]}）。`);
+  L.push(`请输出中文分析，500 字以内，markdown 列表，不要代码块，包含四个小标题：
+① **都是什么软件产生的**：逐组判断这些文件来自什么软件/程序、用途是什么；
+② **产生的内容是什么**：哪些是有价值的工作产出，哪些是程序自动生成的缓存/数据/配置；
+③ **存放位置评估**：哪些文件放在那里合理、哪些不合理（例如程序文件散放桌面）；
+④ **管理能力评估**：对文件管理习惯的总体评价，并给 3 条可执行的改进建议。`);
+  let p=L.join("\n"); if(p.length>9000) p=p.slice(0,9000)+"\n（清单过长已截断）";
+  return p;
+}
+async function aiSummarize(){
+  if(state.aiBusy) return;
+  const b=curBundle(); if(!b||!b.count){ toast("当天没有文件可分析",true); return; }
+  if(!sdk||!sdk.ai||!sdk.ai.chat){ toast("当前运行环境不支持 AI 分析",true); return; }
+  let catalog=null; try{ catalog=await sdk.ai.listModels(); }catch(e){}
+  const cap=catalog&&catalog.capabilities;
+  if(!cap||cap.outputBudget!=="auto-v1"||cap.completionMetadata!==true){
+    toast("当前 NewMax 主机版本不支持长文本输出握手，请更新并重启后重试",true); return;
+  }
+  state.aiBusy=true; renderSummary();
+  let rec=null;
+  try{
+    const res=await sdk.ai.chat({prompt:buildAiPrompt(b), maxTokens:"auto", timeoutMs:180000});
+    rec={key:sumAiKey(), text:res.text||"", model:res.model||"默认", ts:new Date().toISOString(),
+         truncated:!!res.truncated, error:res.ok?null:(res.error||`终止状态:${res.termination||"unknown"}`)};
+    if(!res.ok && !res.text) toast("AI 分析失败："+(res.error||res.termination||"未知"),true);
+  }catch(e){
+    rec={key:sumAiKey(), text:"", model:"—", ts:new Date().toISOString(), truncated:false, error:e.message};
+    toast("AI 分析失败："+e.message,true);
+  }
+  state.aiBusy=false; state.aiCache=rec;
+  if(rec.text && !rec.error){ try{ await sdk.data.set(rec.key, rec); }catch(err){} }
+  renderSummary();
+}
+/* ---------------- 清单渲染 ---------------- */
+function renderList(){
+  const box=$("#list");
+  if(!sdk || !sdk.files){ box.innerHTML=stateCard("🔌","运行环境不可用",
+    "此应用需要在新Max应用窗口内运行（依赖本地文件与运行时接口）。",""); return; }
+  if(!state.svcOk){ box.innerHTML=stateCard("🖥️","索引服务未连接",
+    "本地索引服务由新Max在打开应用窗口时自动启动。若长时间未连接，请关闭窗口后从侧栏重新打开应用。",
+    `<button class="btn primary" id="btnRetry">重试连接</button>`);
+    $("#btnRetry").onclick=retryBind; return; }
+  const ov=state.overview;
+  if(ov && !ov.hasIndex){
+    const labels=(ov.roots||[]).filter(r=>r.exists).map(r=>r.label).join("、")||"常用目录";
+    box.innerHTML=stateCard("📭","还没有任何记录",
+      `首次扫描会读取你常用目录（${labels}）中文件的创建与修改时间，建立每日索引。只读取文件属性，不读取文件内容。`,
+      `<button class="btn primary" id="btnFirstScan">开始首次扫描</button>`);
+    $("#btnFirstScan").onclick=()=>startScan("full"); return;
+  }
+  if(!state.dayData){ box.innerHTML=`<div class="state-card"><div class="big">⏳</div><h3>加载中…</h3></div>`; return; }
+  const b=curBundle();
+  const groups=(state.group==="software"?b.bySoftware:b.byType)||[];
+  const q=state.query.trim().toLowerCase();
+  let filtered=[];
+  for(const g of groups){
+    const files=q? g.files.filter(f=>f.name.toLowerCase().includes(q)) : g.files;
+    if(files.length) filtered.push({...g, files});
+  }
+  if(!filtered.length){
+    const why = q? `没有匹配「${esc(state.query)}」的文件`
+      : `${fmtDateCn(state.date)} 没有${state.tab==="created"?"新建":"被修改"}的文件`;
+    box.innerHTML=stateCard("🍃", why,
+      q? "换个关键词试试。" : "可点击右上方「刷新」增量扫描最新文件；也可以切换到另一页签或前后翻一天。",
+      q? "" : `<button class="btn" id="btnPrevDay">看前一天</button> <button class="btn primary" id="btnScanEmpty">增量刷新</button>`);
+    const p=$("#btnPrevDay"); if(p)p.onclick=()=>selectDate(localDateOffset(state.date,-1));
+    const s=$("#btnScanEmpty"); if(s)s.onclick=()=>startScan("incremental");
+    return;
+  }
+  let html="";
+  for(const g of filtered){
+    const ck=g.key;
+    const closed=state.collapsed.has(ck);
+    const color = state.group==="software" ? "#0f6e62" : (CAT_COLORS[g.key]||CAT_COLORS["其他"]);
+    html+=`<section class="grp${closed?" closed":""}" data-key="${esc(ck)}">
+      <div class="grp-head" role="button" tabindex="0" aria-expanded="${!closed}">
+        <span class="grp-caret">▼</span><span class="grp-dot" style="background:${color}"></span>
+        <span class="grp-name">${esc(ck)}</span>
+        <span class="grp-meta">${g.files.length} 个 · ${fmtBytes(g.bytes)}</span>
+      </div>`;
+    if(!closed) for(const f of g.files){
+      const bg = CAT_COLORS[f.cat]||CAT_COLORS["其他"];
+      const label=(f.ext||f.cat).slice(0,3).toUpperCase();
+      html+=`<div class="file-row" title="${esc(f.path)}">
+        <span class="badge" style="background:${bg}">${esc(label)}</span>
+        <div class="f-main"><div class="f-name">${esc(f.name)}</div>
+          <div class="f-path">${esc(f.path)}</div></div>
+        <span class="f-size">${fmtBytes(f.size)}</span>
+        <span class="f-time">${fmtClock(state.tab==="created"?f.ctime:f.mtime)}</span>
+        <button class="f-open" data-path="${esc(f.path)}">📂 打开</button>
+      </div>`;
+    }
+    html+="</section>";
+  }
+  box.innerHTML=html;
+  box.querySelectorAll(".grp-head").forEach(h=>{
+    const act=()=>{ const k=h.closest(".grp").dataset.key;
+      if(state.collapsed.has(k)) state.collapsed.delete(k); else state.collapsed.add(k);
+      renderList(); };
+    h.onclick=act;
+    h.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(); } };
+  });
+  box.querySelectorAll(".f-open").forEach(b=>b.onclick=async ()=>{
+    try{ await api("/api/reveal",{method:"POST",body:JSON.stringify({path:b.dataset.path})});
+      toast("已在资源管理器中定位文件"); }
+    catch(e){ toast("打开失败："+e.message,true); }
+  });
+}
+function localDateOffset(dateStr, delta){
+  const d=parseDate(dateStr); d.setDate(d.getDate()+delta);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function stateCard(big,title,desc,btn){
+  return `<div class="state-card"><div class="big">${big}</div><h3>${title}</h3><p>${desc}</p>${btn||""}</div>`;
+}
+function retryBind(){ setSvc(false,true); connectService().then(ok=>{ if(ok) afterConnect(); else { setSvc(false); renderList(); } }); }
+
+/* ---------------- 扫描流程 ---------------- */
+async function startScan(mode){
+  if(!state.svcOk) return;
+  try{ await api("/api/scan",{method:"POST",body:JSON.stringify({mode})}); }
+  catch(e){ if(!/正在进行/.test(e.message)){ toast(e.message,true); return; } }
+  showProgress(mode==="full"?"全量扫描":"增量扫描");
+  const h=setInterval(pollScan,700);
+  await sleep(400);
+  let final=null;
+  for(;;){
+    final=await pollScan();
+    if(!final || !final.running) break;
+    await sleep(500);
+  }
+  clearInterval(h); hideProgress();
+  await scanDone(final);
+}
+let lastProgressTs=0;
+async function pollScan(){
+  let s=null;
+  try{ s=await api("/api/scan/status"); }catch(e){ return null; }
+  if(s && s.running){
+    const now=Date.now();
+    if(now-lastProgressTs>400){ lastProgressTs=now;
+      setProgress(`${s.mode==="full"?"全量":"增量"}扫描中 · 已遍历 ${s.dirs_done} 个目录 / ${s.files_seen} 个文件 · 收录 ${s.collected}`);
+    }
+  }
+  return s;
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function showProgress(t){ $("#progress").classList.add("show"); setProgress(t); }
+function setProgress(t){ $("#progressText").textContent=t; }
+function hideProgress(){ $("#progress").classList.remove("show"); }
+
+async function scanDone(status){
+  await loadOverview().catch(()=>{});
+  await loadDay().catch(()=>{});
+  if(!status) return;
+  if(status.error) toast("扫描完成（有告警）："+status.error, true);
+  else if(status.phase==="failed") toast("扫描失败："+(status.error||"未知错误"), true);
+  else toast("扫描完成，收录 "+(status.collected||0)+" 条记录");
+}
+
+/* ---------------- 设置抽屉 ---------------- */
+let cfgDraft=null;
+function openDrawer(){
+  $("#overlay").classList.add("show"); $("#drawer").classList.add("show");
+  loadConfig().catch(e=>toast(e.message,true));
+}
+function closeDrawer(){ $("#overlay").classList.remove("show"); $("#drawer").classList.remove("show"); }
+async function loadConfig(){
+  const c=await api("/api/config");
+  cfgDraft={roots:JSON.parse(JSON.stringify(c.roots||[])),rules:JSON.parse(JSON.stringify(c.rules||[]))};
+  renderCfg();
+}
+function renderCfg(){
+  const rl=$("#rootsList");
+  rl.innerHTML=cfgDraft.roots.map((r,i)=>`<div class="set-item">
+    <span class="si-label">${esc(r.label||"")}</span>
+    <span class="si-path" title="${esc(r.path)}">${esc(r.path)}</span>
+    <button class="si-del" data-i="${i}" aria-label="删除目录">✕</button></div>`).join("");
+  rl.querySelectorAll(".si-del").forEach(b=>b.onclick=()=>{ cfgDraft.roots.splice(+b.dataset.i,1); renderCfg(); });
+  const sl=$("#rulesList");
+  sl.innerHTML=cfgDraft.rules.map((r,i)=>`<div class="set-item">
+    <span class="si-label">${esc(r.software)}</span>
+    <span class="si-path" title="${esc(r.path)}">${esc(r.path)}</span>
+    <button class="si-del" data-i="${i}" aria-label="删除规则">✕</button></div>`).join("")
+    || '<div class="hint">暂无规则，文件将按监控目录归组。</div>';
+  sl.querySelectorAll(".si-del").forEach(b=>b.onclick=()=>{ cfgDraft.rules.splice(+b.dataset.i,1); renderCfg(); });
+  const ov=state.overview;
+  $("#indexStats").textContent = ov? `当前索引 ${ov.totals.files} 个文件 · ${fmtBytes(ov.totals.bytes)} · 上次扫描 ${fmtScanTime(ov.lastScan)||"从未"}` : "";
+}
+function bindCfgButtons(){
+  $("#btnAddRoot").onclick=()=>{
+    const p=$("#newRootPath").value.trim(), l=$("#newRootLabel").value.trim();
+    if(!p){ toast("请填写目录路径",true); return; }
+    cfgDraft.roots.push({path:p,label:l||p.replace(/[\\/]+$/,"").split(/[\\/]/).pop()});
+    $("#newRootPath").value=""; $("#newRootLabel").value=""; renderCfg();
+  };
+  $("#btnAddRule").onclick=()=>{
+    const p=$("#newRulePath").value.trim(), s=$("#newRuleSw").value.trim();
+    if(!p||!s){ toast("规则需要目录路径和软件名",true); return; }
+    cfgDraft.rules.push({path:p,software:s});
+    $("#newRulePath").value=""; $("#newRuleSw").value=""; renderCfg();
+  };
+  $("#btnSaveCfg").onclick=async ()=>{
+    try{
+      await api("/api/config",{method:"POST",body:JSON.stringify({roots:cfgDraft.roots,rules:cfgDraft.rules})});
+      toast("已保存，正在全量重建索引…"); closeDrawer();
+      await startScan("full");
+    }catch(e){ toast("保存失败："+e.message,true); }
+  };
+  $("#btnCancelCfg").onclick=closeDrawer;
+  $("#btnCloseDrawer").onclick=closeDrawer;
+  $("#overlay").onclick=closeDrawer;
+  $("#btnFullRescan").onclick=async ()=>{ closeDrawer(); await startScan("full"); };
+  $("#btnStopSvc").onclick=async ()=>{
+    if(!confirm("停止索引服务后需要重新打开应用窗口才能恢复。确定停止？")) return;
+    try{ await api("/api/stop",{method:"POST",body:"{}"}); }catch(e){}
+    setSvc(false); closeDrawer(); renderList(); toast("服务已停止");
+  };
+}
+
+/* ---------------- 交互与启动 ---------------- */
+function bindUI(){
+  $("#btnPrev").onclick=()=>selectDate(localDateOffset(state.date,-1));
+  $("#btnNext").onclick=()=>selectDate(localDateOffset(state.date,1));
+  $("#btnToday").onclick=()=>selectDate(localDate(0));
+  $("#datePick").onchange=e=>{ if(e.target.value) selectDate(e.target.value); };
+  $("#tabCreated").onclick=()=>setTab("created");
+  $("#tabModified").onclick=()=>setTab("modified");
+  $("#grpSoftware").onclick=()=>setGroup("software");
+  $("#grpType").onclick=()=>setGroup("type");
+  $("#search").oninput=e=>{ state.query=e.target.value; renderList(); };
+  $("#btnScan").onclick=()=>startScan("incremental");
+  $("#btnSettings").onclick=openDrawer;
+  document.addEventListener("keydown",e=>{
+    if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if($("#drawer").classList.contains("show")) { if(e.key==="Escape") closeDrawer(); return; }
+    if(e.key==="ArrowLeft") selectDate(localDateOffset(state.date,-1));
+    if(e.key==="ArrowRight") selectDate(localDateOffset(state.date,1));
+  });
+  window.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDrawer(); });
+}
+function setTab(t){ state.tab=t;
+  $("#tabCreated").classList.toggle("on",t==="created");
+  $("#tabModified").classList.toggle("on",t==="modified");
+  renderStats(); renderSummary(); renderList(); saveUiPrefs(); }
+function setGroup(g){ state.group=g;
+  $("#grpSoftware").classList.toggle("on",g==="software");
+  $("#grpType").classList.toggle("on",g==="type");
+  renderList(); saveUiPrefs(); }
+function saveUiPrefs(){
+  try{ sdk && sdk.data && sdk.data.set("ui-prefs",{tab:state.tab,group:state.group}); }catch(e){}
+}
+async function loadUiPrefs(){
+  try{ const p=await sdk.data.get("ui-prefs"); if(p){ if(p.tab)state.tab=p.tab; if(p.group)state.group=p.group; } }catch(e){}
+  $("#tabCreated").classList.toggle("on",state.tab==="created");
+  $("#tabModified").classList.toggle("on",state.tab==="modified");
+  $("#grpSoftware").classList.toggle("on",state.group==="software");
+  $("#grpType").classList.toggle("on",state.group==="type");
+}
+function bindBrand(){
+  try{
+    const b=sdk && sdk.app && sdk.app.getBootstrap && sdk.app.getBootstrap();
+    if(b && typeof b.then==="function"){
+      b.then(bs=>{
+        if(bs && bs.name){ $("#brandName").textContent=bs.name; document.title=bs.name; }
+        if(bs && bs.iconUrl){ $("#brandIcon").innerHTML=`<img src="${bs.iconUrl}" alt="">`; }
+      }).catch(()=>{});
+    }
+  }catch(e){}
+}
+
+async function afterConnect(){
+  bindBrand();
+  await loadOverview();
+  $("#datePick").value=state.date;
+  await loadDay();
+  const ov=state.overview;
+  if(ov && !ov.hasIndex){ renderList(); }
+  // 扫描完成后刷新
+  const s=await api("/api/scan/status").catch(()=>null);
+  if(s && s.running){ showProgress("扫描进行中…"); const h=setInterval(async()=>{ const st=await pollScan();
+    if(st && !st.running){ clearInterval(h); hideProgress(); scanDone(st);
+      if(st.collected>0 && !state.overview.hasIndex){} } },900); }
+}
+
+(async function boot(){
+  bindUI(); bindCfgButtons(); await loadUiPrefs();
+  renderDateLabel();
+  const ok=await connectService();
+  if(ok){ await afterConnect(); }
+  else { renderList(); }
+})();
+</script>
+</body>
+</html>
